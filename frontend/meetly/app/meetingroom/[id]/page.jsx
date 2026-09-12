@@ -1,5 +1,10 @@
 "use client"
 
+import ChatPanel from "@/app/components/meeting/ChatPanel"
+import ParticipantsList from "@/app/components/meeting/ParticipantsList"
+import VideoGrid from "@/app/components/meeting/VideoGrid"
+import { useChat } from "@/app/hooks/useChat"
+import useWebRTC from "@/app/hooks/useWebRTC"
 import { dummyMeetingDetails, dummyUser } from "@/asset"
 import { useParams, useRouter } from "next/navigation"
 import { useCallback, useState } from "react"
@@ -14,6 +19,12 @@ function page() {
   const handleMeetingEnded = useCallback(()=> {
     router.push('/dashboard')
   },[router])
+
+  //* Initialize WebRTc
+  const {localStream, remoteUsers, audioEnabled, videoEnabled, toggleAudio, toggleVideo, emdMeeting} = useWebRTC(meetingId, userdata, handleMeetingEnded)
+
+  //* Initialize Chat
+  const {messages, sendMessage, unreadCount, isChatOpen, toggleChat} = useChat(meetingId, userdata)
 
   const isHost = true;
 
@@ -36,6 +47,17 @@ function page() {
 
 {/*   Main Content Area */}
 <div className="flex-1 flex overflow-hidden relative">
+  {/* Video Grid Center */}
+  <VideoGrid localStream={localStream} localUser={userdata} remoteUsers={remoteUsers} audioEnabled={audioEnabled} videoEnabled={videoEnabled}/>
+
+  {/* Meeting Chat Drawer */}
+  <ChatPanel isOpen={isChatOpen} onClose={toggleChat} messages={messages} onSendMessage={sendMessage} currentUser={userdata}/>
+
+  {/* ParticipantsList */}
+  <ParticipantsList  isOpen={isParticipantsOpen} onClose={()=> setIsParticipantsOpen(false)} localUser={userdata} localAudio={audioEnabled} localVideo={videoEnabled} remoteUsers={remoteUsers} meetingHostId={dummyUser.id}/>
+
+    {/* Floating Control bar */}
+
 
 </div>
     </div>

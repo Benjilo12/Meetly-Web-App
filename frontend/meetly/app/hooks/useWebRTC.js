@@ -3,7 +3,7 @@
 import { dummyRemoteParticipants } from '@/asset'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
-import { Mic, MicOff } from 'lucide-react';
+import { Mic, MicOff, Video, VideoOff } from 'lucide-react';
 
 const useWebRTC = (_roomId, user, onMeetingEnded, _enabled = true) => {
 
@@ -15,6 +15,7 @@ const useWebRTC = (_roomId, user, onMeetingEnded, _enabled = true) => {
      const localStreamRef = useRef(null)
 
      //* Initialize local camera stream if available
+     //! TODO use sentry to catch errors
      const initLocalStream = useCallback(async () => {
         try {
            if(navigator?.mediaDevices?.getUserMedia){
@@ -52,10 +53,34 @@ const useWebRTC = (_roomId, user, onMeetingEnded, _enabled = true) => {
         }
         toast(newState ? "Microphone turned on" : "Microphone muted",{icon: newState ? <Mic size={20} /> : <MicOff size={20} />})
      }
-  return (
-    <div>
-      
-    </div>
+
+     //* Toggle local camera
+      const toggleVideo = () => {
+        const newState = !videoEnabled
+        setAudioEnabled(newState);
+        if(localStreamRef.current){
+            const videoTrack = localStreamRef.current.getVideoTracks()[0]
+            if (videoTrack) videoTrack.enabled = newState;
+        }
+        toast(newState ? "Camera turned on" : "Microphone muted",{icon: newState ? <Video size={20} /> : <VideoOff size={20} /> })
+     }
+
+
+     //* End Meeting for everyone
+     const endMeeting = useCallback(()=> {
+        if(onMeetingEnded){
+            onMeetingEnded("Meeting ended")
+        }
+     },[onMeetingEnded])
+  return ({    localStream,
+    remoteUsers,
+    audioEnabled,
+    videoEnabled,
+    toggleAudio,
+    toggleVideo,
+    endMeeting
+}
+
   )
 }
 
