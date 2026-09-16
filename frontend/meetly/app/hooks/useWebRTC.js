@@ -57,12 +57,12 @@ const useWebRTC = (_roomId, user, onMeetingEnded, _enabled = true) => {
      //* Toggle local camera
       const toggleVideo = () => {
         const newState = !videoEnabled
-        setAudioEnabled(newState);
+                setVideoEnabled(newState);
         if(localStreamRef.current){
             const videoTrack = localStreamRef.current.getVideoTracks()[0]
             if (videoTrack) videoTrack.enabled = newState;
         }
-        toast(newState ? "Camera turned on" : "Microphone muted",{icon: newState ? <Video size={20} /> : <VideoOff size={20} /> })
+                toast(newState ? "Camera turned on" : "Camera turned off",{icon: newState ? <Video size={20} /> : <VideoOff size={20} /> })
      }
 
 

@@ -1,6 +1,6 @@
 "use client"
 import { dummyUser } from "@/asset"
-import { UserButton } from "@clerk/nextjs"
+import { UserButton, useUser } from "@clerk/nextjs"
 import { AstroidIcon, HistoryIcon, LayoutDashboardIcon } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
@@ -8,7 +8,7 @@ import { usePathname } from "next/navigation"
 
 
 function Navbar() {
-  const {isSignedIn, user} = {user: dummyUser, isSignedIn:true}
+  const {isSignedIn, user} = useUser()
   const pathname = usePathname()
   const userName  = user?.fullName || user?.firstName || user?.primaryEmailAddress?.emailAddress?.split("@")[0] || "user";
   return (
@@ -27,7 +27,7 @@ function Navbar() {
           <LayoutDashboardIcon className="w-3.5 h-3.5"/>
           Dashboard</Link>
 
-          <Link href="/sessions" className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-all flex items-center gap-1.5 ${pathname === '/sessions' ? "ring ring-blue-100 bg-blue-50 text-slate-800" : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"}`}>
+          <Link href="/session" className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-all flex items-center gap-1.5 ${pathname === '/sessions' ? "ring ring-blue-100 bg-blue-50 text-slate-800" : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"}`}>
           <HistoryIcon className="w-3.5 h-3.5"/>
           Sessions</Link>
 

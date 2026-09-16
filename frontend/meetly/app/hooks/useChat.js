@@ -22,10 +22,10 @@ export const useChat = (_roomId, user)=> {
     );
 
     const toggleChat = useCallback(() => {
-        setIsChatOpen=> {
+        setIsChatOpen((prev) => {
             if(!prev) setUnreadCount(0)
                 return !prev
-        }
+        })
     },[])
     return {
         messages,

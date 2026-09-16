@@ -1,16 +1,17 @@
 "use client"
-import { dummyStats, dummyUser } from '@/asset'
+import { dummyStats } from '@/asset'
+import { useAuth, useUser } from '@clerk/nextjs';
 import { ArrowRightIcon, KeyboardIcon, PlusIcon, ShieldCheckIcon } from 'lucide-react'
 import { useRouter } from 'next/navigation';
 import {useEffect, useState} from 'react'
 import toast from 'react-hot-toast';
+import Loader from '../components/Loader';
 
 function page() {
-  const user = dummyUser;
-  const userName = user.fullName
-  const userEmail = user.primaryEmailAddress.emailAddress;
+  const {isLoaded: isUserLoaded, user} = useUser();
   const [isCreating, setIsCreating] = useState(false)
   const [currentTime, setCurrentTime] = useState(null)
+  const {isLoaded, isSignedIn} = useAuth()
   const stats = dummyStats;
    const router = useRouter();
 
@@ -22,6 +23,23 @@ function page() {
  const timer = setInterval(()=> setCurrentTime(new Date()), 1000);
  return ()=> clearInterval(timer)
    },[])
+
+   useEffect(()=> {
+     if(isLoaded && !isSignedIn){
+       router.push('/login');
+     }
+   },[isLoaded, isSignedIn, router])
+
+     if(!isLoaded || !isUserLoaded){
+      return <Loader text='Authenticating...'/>
+     }
+
+     if(!isSignedIn){
+         return null;
+     }
+
+   const userName = user?.fullName ?? ''
+   const userEmail = user?.primaryEmailAddress?.emailAddress ?? '';
 
    //* fxn to create meeting
    const handleCreateMeeting = () => {
