@@ -10,6 +10,7 @@ import { useState } from "react";
 import { dummySessions } from "@/asset";
 import EmptySessions from "../components/sessions/EmptySessions";
 import SessionCard from "../components/sessions/SessionCard";
+import SessionDetailModel from "../components/sessions/SessionDetailModel";
 
 
 function Session() {
@@ -27,6 +28,14 @@ function Session() {
        if(!isSignedIn){
            router.push('/login');
        }
+
+       //* fxn to see session details
+       const openSessionDetails = (sessionId)=> {
+        const session = sessions.find((s)=>s.id === sessionId || s.meetingId === sessionId)
+        if(session){
+          setSelectedSession(session)
+        }
+       }
   return (
      <div
       className="h-screen overflow-y-scroll bg-gray-50 text-slate-900 flex flex-col font-sans"
@@ -38,7 +47,7 @@ function Session() {
       }}
     >
       <Navbar />
-    <main className="flex-1 max-w-7xl w-full max-auto p-6 md:p-12">
+    <main className="flex-1 max-w-7xl w-full mx-auto p-6 md:p-12 ">
       {/* Page Title & Navigate Header */}
       <Link href="/dashboard" className="flex items-center text-sm gap-1 mb-4 text-slate-500 hover:text-slate-900 transition-colors">
       <ArrowLeftIcon size={14}/>Go to Dashboard</Link>
@@ -50,13 +59,13 @@ function Session() {
       {sessions.length === 0  ?(
        <EmptySessions />
       ) :(
-        <div>
-         {sessions.map((session)=> (<SessionCard key={session.id} session={session} onOpenDetails={() => setSelectedSession(session)} onRejoin={(meetingId)=> router.push(`/meetingroom/${meetingId}`)}/>))}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+         {sessions.map((session)=> (<SessionCard key={session.id} session={session} onOpenDetails={openSessionDetails} onRejoin={(meetingId)=> router.push(`/meetingroom/${meetingId}`)}/>))}
         </div>
       )}
 
       {/* Session Detail Modal */}
-      <p>Session Detail Modal</p>
+      <SessionDetailModel session={selectedSession} onClose={()=> setSelectedSession(null)}/>
     </main>
       <Footer />
     </div>
