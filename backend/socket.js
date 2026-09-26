@@ -1,4 +1,3 @@
-import { Socket } from "socket.io";
 import { sql } from "./config/db.js";
 
 // In-memory map used to track active meeting rooms and the participants inside them.
@@ -6,34 +5,34 @@ const rooms = new Map();
 
 // Initialize the Socket.IO event handlers for meeting-related real-time behavior.
 export function setupSocketIO(io){
-    io.on("connection", ()=> {
+    io.on("connection", (socket)=> {
         // Track the current room and user for this connected socket instance.
         let currentRoomId = null;
         let currentUser = null;
 
         // Handle when a client joins a meeting room.
-        Socket.on("join-room", async({roomId, user, audioEnabled = true, videoEnabled}) => {
+        socket.on("join-room", async({roomId, user, audioEnabled = true, videoEnabled}) => {
             try {
                 // Verify that the meeting actually exists before allowing a user to join.
                 const meetings = await sql`SELECT * FROM meetings WHERE meeting_id =${roomId}`
 
                 if (meetings.length === 0){
-                    Socket.emit("meeting-ended", {message: "Meeting not found"})
+                    socket.emit("meeting-ended", {message: "Meeting not found"})
                     return
                 }
-                const meeting = meeting[0];
+                const meeting = meetings[0];
 
                 // Prevent participants from joining a room that has already been ended.
                 if(meeting.status === "ended"){
-                    Socket.emit("meeting-ended", {message: "This meeting has already ended"})
+                    socket.emit("meeting-ended", {message: "This meeting has already ended"})
                     return;
                 }
                 currentRoomId = roomId;
-                const isHost = meeting.host_id && user?.id && meeting.host_id.toString()
+                const isHost = Boolean(meeting.host_id && user?.id && meeting.host_id.toString() === user.id.toString())
 
                 // Store the connected user's room state for this socket.
                 currentUser = {
-                    Socketid: Socket.id,
+                    socketId: socket.id,
                     userId: user?.id,
                     userName: user?.name || "Anonymous",
                     isHost,
@@ -58,19 +57,19 @@ export function setupSocketIO(io){
 
                 // Stop joining if the room has reached its allowed participant count.
                 if(roomParticipants.size >= maxParticipants){
-                  Socket.emit("meeting-ended", {
+                  socket.emit("meeting-ended", {
                     message: `Meeting capacity limit reached(max ${maxParticipants} participants for ${hostPlan.toUpperCase()} plan). Host must upgrade to Premium for up to 100 participants!`,
                   })  
                   return;
                 }
-                Socket.join(roomId)
+                socket.join(roomId)
 
 
                 // Gather currently connected participants already in the room.
                 const existingUsers = Array.from(roomParticipants.values());
 
                 // Add the new participant to the in-memory room state.
-                roomParticipants.set(Socket.id, currentUser);
+                roomParticipants.set(socket.id, currentUser);
 
 
 
@@ -79,19 +78,19 @@ export function setupSocketIO(io){
                 const existingParticipants = await sql`
                 SELECT id FROM meeting_participants
                 WHERE meeting_id = ${meeting.id}
-                AND ((${userId}::text IS NOT NULL user_id = ${userId}) OR name = ${currentUser.userName})`
+                AND ((${userId}::text IS NOT NULL AND user_id = ${userId}) OR name = ${currentUser.userName})`
 
                 if(existingParticipants.length === 0){
-                    sql`
+                    await sql`
                     INSERT INTO meeting_participants (meeting_id, user_id, name, joined_at)
                     VALUES (${meeting.id}, ${userId}, ${currentUser.userName}, NOW( ))`
                 }
 
                 //Send list existing users to the newcomer
-                Socket.emit("all-users", existingUsers)
+                socket.emit("all-users", existingUsers)
 
                 //Notify everyone else in the room
-                Socket.to(roomId).emit("user-joined", currentUser)
+                socket.to(roomId).emit("user-joined", currentUser)
             } catch (error) {
                 // Log the error for debugging if a socket join fails.
             }
@@ -100,7 +99,7 @@ export function setupSocketIO(io){
         //WebRTC signaling: Offer
         // Send the information needed to start the connection
 
-        Socket.on('offer', ({targetSocketId, callerSocketId, sdp})=> {
+        socket.on('offer', ({targetSocketId, callerSocketId, sdp})=> {
             io.to(targetSocketId).emit("offer", {
                 callerSocketId,
                 sdp,
@@ -110,9 +109,9 @@ export function setupSocketIO(io){
 
         // WebRTC Signaling: Answer
         // accept_ the offer request and process the connection
-          Socket.on('answer', ({targetSocketId, responderSocketId, sdp})=> {
+          socket.on('answer', ({targetSocketId, responderSocketId, sdp})=> {
             io.to(targetSocketId).emit("answer", {
-                callerSocketId,
+                responderSocketId,
                 sdp,
             })
         })
@@ -121,7 +120,7 @@ export function setupSocketIO(io){
         // passes the connection details from user to the other so WebRTC can figure out how to connect them directly.
 
 
-        Socket.on('ice-candidate', ({ targetSocketId, senderSocketId, candidate}) => {
+        socket.on('ice-candidate', ({ targetSocketId, senderSocketId, candidate}) => {
             io.to(targetSocketId).emit("ice-candidate", {
                 senderSocketId,
                 candidate,
@@ -129,30 +128,35 @@ export function setupSocketIO(io){
         })
 
         // Audio toggle event
-        Socket.on('toggle-audio', ({roomId, audioEnabled }) => {
-           if(rooms.has(roomId) && rooms.get(roomId).has(Socket.id)){
-            rooms.get(roomId).get(Socket.id).audioEnabled = audioEnabled
+          socket.on('toggle-audio', ({roomId, audioEnabled }) => {
+              if(rooms.has(roomId) && rooms.get(roomId).has(socket.id)){
+                rooms.get(roomId).get(socket.id).audioEnabled = audioEnabled
            }
-           Socket.to(roomId).emit('user-toggled-audio', {
-            Socketid: Socket.id,
+              socket.to(roomId).emit('user-toggled-audio', {
+                socketId: socket.id,
             audioEnabled,
            })
         })
 
         // Video toggle event
-        Socket.on('toggle-Video', ({roomId, videoEnabled }) => {
-           if(rooms.has(roomId) && rooms.get(roomId).has(Socket.id)){
-            rooms.get(roomId).get(Socket.id).videoEnabled = videoEnabled
+          socket.on('toggle-Video', ({roomId, videoEnabled }) => {
+              if(rooms.has(roomId) && rooms.get(roomId).has(socket.id)){
+                rooms.get(roomId).get(socket.id).videoEnabled = videoEnabled
            }
-           Socket.to(roomId).emit('user-toggled-video', {
-            Socketid: Socket.id,
+              socket.to(roomId).emit('user-toggled-video', {
+                socketId: socket.id,
            videoEnabled,
            })
         })
 
        // chat message event -> persist to DB &  broadcast
-       Socket.on("send-message", async ({roomId, message})=> {
+    socket.on("send-message", async ({roomId, message})=> {
         try {
+            const text = typeof message?.text === "string" ? message.text.trim() : "";
+            if (!roomId || !text) {
+                return;
+            }
+
             const meetings = await sql`SELECT id, status FROM meetings WHERE meeting_id = ${roomId}`;
 
             if(meetings.length > 0 && meetings[0].status !== "ended"){
@@ -161,12 +165,13 @@ export function setupSocketIO(io){
 
                 await sql`
                 INSERT INTO meeting_messages (meeting_id, sender_id, sender_name, text, timestamp)
-                VALUES (${meetingId}, ${senderId}, ${message.senderName || "Anonymous"}, ${message.text}, NOW())
+                VALUES (${meetingId}, ${senderId}, ${message.senderName || "Anonymous"}, ${text}, NOW())
                 `
 
                 io.in(roomId).emit("receive-message", {
                     ...message,
-                    senderSocketId: Socket.id,
+                    text,
+                    senderSocketId: socket.id,
                 })
             }
         } catch (error) {
@@ -177,14 +182,15 @@ export function setupSocketIO(io){
 
        // Host ends meeting for all Via End Meeting Button
         // Video toggle event
-        Socket.on('end-meeting', async ({roomId }) => {
+        socket.on('end-meeting', async ({roomId }) => {
            try {
             await sql`
-            SET status = 'ended, ended_at = NOW()
-            UPDATE meetings_id = ${roomId}
+            UPDATE meetings
+            SET status = 'ended', ended_at = NOW()
+            WHERE meeting_id = ${roomId}
             `;
 
-            io.on(roomId).emit("meeting-ended", { message: "The meeting has been ended by the host."});
+            io.to(roomId).emit("meeting-ended", { message: "The meeting has been ended by the host."});
             rooms.delete(roomId);
     
            } catch (error) {
@@ -194,17 +200,17 @@ export function setupSocketIO(io){
         })
 
        // Handle Disconnect (Reloading window, network drop, or closing tab)
-        Socket.on('disconnect', async ({roomId }) => {
+        socket.on('disconnect', async () => {
          if (currentRoomId && rooms.has(currentRoomId)){
             const roomParticipants = rooms.get(currentRoomId);
-            roomParticipants.delete(Socket.id);
+            roomParticipants.delete(socket.id);
 
             if (roomParticipants.size === 0){
                 rooms.delete(currentRoomId)
             }else{
                 //Notify remaining peers that a user disconnected
-                Socket.to(currentRoomId).emit("user-left", {
-                    Socketid: Socket.id,
+                socket.to(currentRoomId).emit("user-left", {
+                    socketId: socket.id,
                     user: currentUser,
                 })
             }

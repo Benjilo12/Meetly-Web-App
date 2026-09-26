@@ -3,24 +3,69 @@
 import ChatPanel from "@/app/components/meeting/ChatPanel"
 import ControlBar from "@/app/components/meeting/ControlBar"
 import ParticipantsList from "@/app/components/meeting/ParticipantsList"
-import { useAuth } from "@clerk/nextjs"
+import { useAuth, useUser } from "@clerk/nextjs"
 import VideoGrid from "@/app/components/meeting/VideoGrid"
 import { useChat } from "@/app/hooks/useChat"
-import useWebRTC from "@/app/hooks/useWebRTC"
+import {useWebRTC} from "@/app/hooks/useWebRTC"
 import { dummyMeetingDetails, dummyUser } from "@/asset"
 import { useParams, useRouter } from "next/navigation"
-import { useCallback, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import toast from "react-hot-toast"
 import Loader from "@/app/components/Loader"
+import api from "@/app/config/api"
 
 
 function page() {
-  const {meetingId} = useParams()
+  const { id: meetingId } = useParams()
   const router = useRouter()
   const { isLoaded, isSignedIn } = useAuth()
-  const userdata = dummyUser;
+   const {user} = useUser()
+   const { getToken } = useAuth()
 
   const [isParticipantsOpen, setIsParticipantsOpen] = useState(false)
+
+  const userdata = useMemo(()=> {
+    if(!user) return null;
+    return {
+      id: user.id,
+      name: user.fullName || user.firstName || user.primaryEmailAddress?.emailAddress?.split("@")[0] || "User",
+      email: user.primaryEmailAddress?.emailAddress || "",
+      image: user.imageUrl || "",
+    }
+  },[user?.id, user?.fullName, user?.firstName, user?.primaryEmailAddress?.emailAddress, user?.imageUrl])
+
+  const [meeting, setMeeting] = useState(null)
+  const [loadingMeeting, setLoadingMeeting] = useState(true);
+
+  //*fetch meeting details to verify validity Before enabling WebRTC camera access
+  useEffect(()=> {
+  const fetchMeeting = async ()=> {
+    if (!isLoaded || !isSignedIn || !meetingId) return;
+
+    try {
+      const token = await getToken();
+      if (!token) return;
+
+      const res = await api.get(`/api/meetings/${meetingId}`, {
+        headers: { Authorization: `Bearer ${token}`,}
+      })
+      if (res.data.meeting.status === "ended"){
+        toast.error("This meeting has ended")
+        router.push("/dashboard")
+      }
+      setMeeting(res.data.meeting)
+    } catch (error) {
+      const errorMsg = error.response?.data?.error || "Meeting not found or has ended";
+      toast.error(errorMsg)
+    }finally{
+      setLoadingMeeting(false)
+    }
+
+  }
+
+  fetchMeeting()
+  },[getToken, isLoaded, isSignedIn, meetingId, router])
+
   const handleMeetingEnded = useCallback(()=> {
     router.push('/dashboard')
   },[router])
@@ -40,7 +85,12 @@ function page() {
     return null
   }
 
-  const isHost = true;
+  const hostId = meeting?.host?.id ?? meeting?.host_id ?? meeting?.host;
+  const isHost = Boolean(
+    userdata?.id &&
+    hostId &&
+    String(hostId) === String(userdata.id)
+  )
 
   //* fxn to handle leave
   const handleLeave = () => {
@@ -55,8 +105,17 @@ function page() {
   toast("Meeting ended for all participants");
   router.push("/dashboard")
   }
+
+  if(loadingMeeting){
+    return <Loader text="Joining meeting room..."/>
+  }
   return (
-    <div  className="h-screen w=screen bg-slate-100 text-slate-900 flex flex-col overflow-hidden relative font-sans">
+    <div
+      className="h-screen w-screen text-slate-900 flex flex-col overflow-hidden relative font-sans"
+      style={{
+        backgroundImage: "radial-gradient(ellipse at 15% 20%, rgba(0, 76, 255, 0.08), transparent 42%), radial-gradient(ellipse at 85% 75%, rgba(16, 185, 129, 0.07), transparent 40%), linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)",
+      }}
+    >
     {/* Top bar */}
     <header className="w-full bg-white/90 backdrop-blur-md px-6 py-3 border-b border-slate-200 flex items-center justify-between z-30 shadow-xs">
     <div className="flex items-center gap-3">

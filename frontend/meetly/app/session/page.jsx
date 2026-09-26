@@ -6,19 +6,40 @@ import Navbar from "../components/Navbar"
 import Loader from "../components/Loader";
 import Link from "next/link";
 import { ArrowLeftIcon } from "lucide-react";
-import { useState } from "react";
-import { dummySessions } from "@/asset";
+import { useEffect, useState } from "react";
+
 import EmptySessions from "../components/sessions/EmptySessions";
 import SessionCard from "../components/sessions/SessionCard";
 import SessionDetailModel from "../components/sessions/SessionDetailModel";
+import api from "../config/api.js";
+import toast from "react-hot-toast";
 
 
 function Session() {
-  const [sessions] = useState(dummySessions)
+  const [sessions, setSessions] = useState([])
   const[selectedSession, setSelectedSession] = useState(null)
    const router = useRouter();
-  const { isLoaded, isSignedIn } = useAuth();
-  
+  const { isLoaded, isSignedIn, getToken } = useAuth();
+  const [loading, setLoading] = useState(true)
+
+
+  useEffect(()=> {
+    const fetchSessions = async ()=> {
+      if (!isLoaded || !isSignedIn) return;
+
+      try {
+        const token = await getToken();
+        if (!token) return;
+        const res = await api.get("/api/meetings/sessions", { headers: {Authorization: `Bearer ${token}`}})
+        setSessions(res.data.meetings || [])
+      } catch (error) {
+        toast.error("failed to load meeting sessions")
+      }finally{
+        setLoading(false)
+      }
+    }
+    fetchSessions()
+  }, [isLoaded, isSignedIn, getToken])
    
   
        if(!isLoaded){
@@ -30,17 +51,26 @@ function Session() {
        }
 
        //* fxn to see session details
-       const openSessionDetails = (sessionId)=> {
-        const session = sessions.find((s)=>s.id === sessionId || s.meetingId === sessionId)
-        if(session){
-          setSelectedSession(session)
-        }
+       const openSessionDetails = async (sessionId)=> {
+       try {
+        const token = await getToken();
+        const res = await api.get(`/api/meetings/sessions/${sessionId}`, { headers : {Authorization: `Bearer ${token}`,}})
+        setSelectedSession(res.data.meeting || res.data.meetings)
+       } catch (error) {
+        toast.error("Could not fetch session details")
        }
+       }
+
+       if(loading){
+        return <Loader text="Loading meeting history..."/>
+       }
+
+
   return (
      <div
       className="h-screen overflow-y-scroll bg-gray-50 text-slate-900 flex flex-col font-sans"
       style={{
-        backgroundImage: "url('/layout_bg.png')",
+        backgroundImage: "url('/layout_bs.jpg')",
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat',

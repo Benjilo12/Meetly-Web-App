@@ -22,9 +22,9 @@ export const  createMeeting = async (req, res)=> {
         if(userPlan === "free"){
             const monthlyCountResult = await sql`
             SELECT COUNT(*) as count
-            FROM meeting
+            FROM meetings
             WHERE host_id = ${userId}
-            AND created_at >= date_trunc('month', N0W())`;
+            AND created_at >= date_trunc('month', NOW())`;
 
             const monthlyCount = parseInt(monthlyCountResult[0]?.count || '0');
 
@@ -40,16 +40,16 @@ export const  createMeeting = async (req, res)=> {
 
         // Generate a short meeting ID and retry if it already exists.
         let meetingId = generateMeetingId()
-        let existing = await sql`SELECT id FROM meeting WHERE meeting_id = ${meetingId}`
+        let existing = await sql`SELECT id FROM meetings WHERE meeting_id = ${meetingId}`
         while(existing.length > 0){
             meetingId = generateMeetingId();
-            existing = await sql`SELECT id FROM meetings meeting_id = ${meetingId}`
+            existing = await sql`SELECT id FROM meetings WHERE meeting_id = ${meetingId}`
         }
 
         // Persist the meeting and return the newly created record.
         const [meeting] = await sql`
-        INSERT INTO meeting(meeting_id, title, host_id, status)
-        VALUES (${meetingId}, ${title || "Instant Meeting"}, ${userId}, active)
+        INSERT INTO meetings(meeting_id, title, host_id, status)
+        VALUES (${meetingId}, ${title || "Instant Meeting"}, ${userId}, ${"active"})
         RETURNING id, meeting_id, title, host_id, status, created_at`
 
         const hostName = users[0]?.name || "Host";
@@ -84,7 +84,11 @@ try {
     const {meetingId} = req.params
 
     // Fetch the meeting together with the host details needed by the client.
-    const meetings = await sql`SELECT m.*, u.id as host_user_id, u.name as host_name, u.meeting_id = ${meetingId}`
+    const meetings = await sql`
+        SELECT m.*, u.id AS host_user_id, u.name AS host_name, u.email AS host_email
+        FROM meetings m
+        JOIN users u ON m.host_id = u.id
+        WHERE m.meeting_id = ${meetingId}`
 
     // Return a not-found response when the meeting does not exist.
     if(meetings.length === 0){
@@ -132,9 +136,9 @@ try {
     // Fetch every meeting where the current user is either the host or a participant.
     // This ensures the dashboard/session list includes both hosted and joined meetings.
     const meetings = await sql`
-    SELECT DISTINCT m.id, m.meeting_id, m.status, m.created_at, m.ended_at, m.host_id, u.name as host_name, u.email as host_email
+    SELECT DISTINCT m.id, m.meeting_id, m.title, m.status, m.created_at, m.ended_at, m.host_id, u.name as host_name, u.email as host_email
     FROM meetings m
-    JOIN users u ON m.hosted_id = u.id
+    JOIN users u ON m.host_id = u.id
     LEFT JOIN meeting_participants mp ON m.id = mp.meeting_id
     WHERE m.host_id = ${userId} OR  mp.user_id = ${userId}
     ORDER BY m.created_at DESC`;
@@ -216,7 +220,7 @@ export const getSessionDetails = async (req, res)=> {
         const m = meetings[0];
 
         // will check if the user is host / not, if they are participants then it returns session details
-        if(m.host_id !== userId) {
+        if(String(m.host_id) !== String(userId)) {
             const membership = await sql`
             SELECT 1 FROM meeting_participants
             WHERE meeting_id = ${m.id} AND user_id = ${userId} LIMIT 1 `;
@@ -281,33 +285,39 @@ export const getSessionDetails = async (req, res)=> {
 
 }
 //*get plan & meetings statistics for user dashboard
-export const getMeetingStats =  async(req, res)=> {
+export const getMeetingStats = async (req, res) => {
     try {
         // Get the current authenticated user's ID.
         const userId = req.user.id;
 
-        // Fetch the user's plan so the dashboard can apply the correct limits.
-        const users = await sql`SELECT plan FROM users WHERE id = ${userId}
-        const plan = user[0]?.plan || "free`;
+        // Fetch the current user's plan so the dashboard can apply the correct limits.
+        const users = await sql`SELECT plan FROM users WHERE id = ${userId}`;
+        const plan = users[0]?.plan || "free";
 
         // Count how many meetings the user has created this month.
-        const monthlyCountResult = sql`
-        SELECT COUNT(*) as count
-        FROM meetings
-        WHERE host_id = ${userId} AND created_at >= data_trunc('month', NOW())`
+        const monthlyCountResult = await sql`
+            SELECT COUNT(*)::int AS count
+            FROM meetings
+            WHERE host_id = ${userId}
+            AND created_at >= date_trunc('month', NOW())
+        `;
 
         // Convert the count to a number for the front-end summary.
-        const monthlyCount = parseInt(monthlyCountResult[0]?.count || '0', 10);
+        const monthlyCount = Number(monthlyCountResult[0]?.count || 0);
 
         // Free users are limited to 30 meetings per month; premium users have no monthly cap.
-        const monthlyLimit =plan ==="premium" ? null :30;
+        const monthlyLimit = plan === "premium" ? null : 30;
 
         // Return a compact stats payload for the dashboard.
-        res.json({plan, monthlyCount, monthlyLimit, maxParticipants: plan === "premium" ? 100 :10,})
+        res.json({
+            plan,
+            monthlyCount,
+            monthlyLimit,
+            maxParticipants: plan === "premium" ? 100 : 10,
+        });
     } catch (error) {
-                console.error("get meeting stats failed:", error);
-         // Surface unexpected database or server errors to the client.
-         res.status(500).json({error: error.message})
+        console.error("get meeting stats failed:", error);
+        // Surface unexpected database or server errors to the client.
+        res.status(500).json({ error: error.message });
     }
-
-}
+};
