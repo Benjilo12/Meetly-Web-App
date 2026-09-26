@@ -7,7 +7,7 @@ function DashboardLayout({ children }) {
     <div
       className="h-screen overflow-y-scroll bg-gray-50 text-slate-900 flex flex-col font-sans"
       style={{
-        backgroundImage: "url('/layout_bg.png')",
+        backgroundImage: "url('/layout_bs.jpg')",
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat',

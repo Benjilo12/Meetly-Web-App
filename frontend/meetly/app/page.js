@@ -1,9 +1,22 @@
-import Image from "next/image";
+import Menu from "./components/Menu";
+import HeroCarousel from "./components/Herocarousel";
+import MeetingModes from "./components/Modes";
+import TeamMemberSection from "./components/TeamMemberSection";
+import Testimonials from "./components/Testimonials";
+import { FAQ } from "./components/Faq";
+import Bottom from "./components/Buttom";
+
 
 export default function Home() {
   return (
-   <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
-      <h1>Welcome to the Home Page</h1>
+   <div >
+    <Menu />
+    <HeroCarousel />
+    <MeetingModes />
+    <TeamMemberSection />
+    <Testimonials />
+    <FAQ />
+    <Bottom />
     </div>
   );
 }

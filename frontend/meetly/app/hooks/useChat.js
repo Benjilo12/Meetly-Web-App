@@ -1,10 +1,34 @@
-import { dummyInitialChatMessages } from "@/asset"
-import { useCallback, useState } from "react"
 
-export const useChat = (_roomId, user)=> {
-    const [messages, setMessages] = useState(dummyInitialChatMessages)
+import { useCallback, useEffect, useRef, useState } from "react"
+import { socket } from "../config/socket.js";
+
+
+export const useChat = (roomId, user)=> {
+    const [messages, setMessages] = useState([])
     const [unreadCount, setUnreadCount] = useState(0);
     const [isChatOpen, setIsChatOpen] = useState(false)
+
+    const isChatOpenRef = useRef(isChatOpen);
+    useEffect(()=> {
+        isChatOpenRef.current = isChatOpen;
+
+    },[isChatOpen])
+
+    useEffect(()=> {
+        if (!roomId) return;
+        const handleReceiveMessage = (message)=> {
+            setMessages((prev)=> [...prev, message])
+            if(!isChatOpenRef.current){
+                setUnreadCount((prev)=> prev + 1)
+            }
+        }
+
+        socket.on("receive-message", handleReceiveMessage)
+
+        return ()=> {
+            socket.off("receive-message", handleReceiveMessage)
+        }
+    },[roomId])
 
     //*custom hook for chatting
     const sendMessage = useCallback(
@@ -17,8 +41,9 @@ export const useChat = (_roomId, user)=> {
                 senderId: user.id,
                 time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit"})
             }
-            setMessages((prev)=> [...prev, message])
-        },[user]
+            socket.emit("send-message", { roomId, message})
+          
+        },[roomId, user?.id, user?.name]
     );
 
     const toggleChat = useCallback(() => {

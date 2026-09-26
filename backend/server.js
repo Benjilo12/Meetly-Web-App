@@ -16,9 +16,9 @@ const app  = express();
 const server = http.createServer(app)
 
 // Allow requests from the configured frontend origins.
-const allowedOrigins = process.env.ORIGINS.split(",")
-app.use(cors({origin: "", Credentials: true}))
-app.use(cookieParser())
+const allowedOrigins = (process.env.ORIGINS || "http://localhost:3000").split(",").map((origin) => origin.trim()).filter(Boolean);
+app.use(cors({ origin: allowedOrigins, credentials: true }));
+app.use(cookieParser());
 
 // Clerk webhook endpoint must parse raw JSON before Express JSON middleware runs.
 app.use("/api/clerk", express.raw({type: "application/json"}), handleClerkWebhook)
@@ -44,14 +44,23 @@ setupSocketIO(io)
 // Centralized error handler for unexpected server errors.
 app.use((err, _req, res, _next)=> {
     console.error(`[Error] ${err.message}`);
-    res.status(500).json({error: err.message});
+    res.status(500).json({error: "Internal server error"});
     
 })
 
 const port = process.env.PORT || 5000;
 
 // Start listening for incoming requests.
+server.on("error", (error) => {
+    if (error.code === "EADDRINUSE") {
+        console.error(`Port ${port} is already in use. Close the stale process and try again.`);
+        process.exit(1);
+    }
+
+    console.error("Server startup error:", error);
+    process.exit(1);
+});
+
 server.listen(port, ()=> {
     console.log(`Server is running at http://localhost:${port}`);
-    
-})
+});

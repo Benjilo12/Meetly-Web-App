@@ -15,9 +15,9 @@ meetingRouter.get("/stats", protect, getMeetingStats);
 meetingRouter.get("/sessions", protect, getUserSessions);
 
 // Get the detailed data for a specific session by ID.
-meetingRouter.get("/sessions:id", protect, getSessionDetails);
+meetingRouter.get("/sessions/:id", protect, getSessionDetails);
 
 // Get a single meeting by its meeting ID.
-meetingRouter.get("/:meetingId", protect,getMeeting);
+meetingRouter.get("/:meetingId", protect, getMeeting);
 
 export default meetingRouter;
