@@ -16,7 +16,10 @@ const app  = express();
 const server = http.createServer(app)
 
 // Allow requests from the configured frontend origins.
-const allowedOrigins = (process.env.ORIGINS || "http://localhost:3000").split(",").map((origin) => origin.trim()).filter(Boolean);
+const allowedOrigins = [...new Set([
+    ...(process.env.ORIGINS || "http://localhost:3000").split(",").map((origin) => origin.trim()).filter(Boolean),
+    "https://meetly-git-main-benjamin-darteys-projects.vercel.app",
+])];
 app.use(cors({ origin: allowedOrigins, credentials: true }));
 app.use(cookieParser());
 
