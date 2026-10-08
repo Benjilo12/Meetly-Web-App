@@ -5,6 +5,7 @@ import TeamMemberSection from "./components/TeamMemberSection";
 import Testimonials from "./components/Testimonials";
 import { FAQ } from "./components/Faq";
 import Bottom from "./components/Buttom";
+import AiNotesShowcase from "./components/Ainotesshowcase";
 
 
 export default function Home() {
@@ -13,6 +14,7 @@ export default function Home() {
     <Menu />
     <HeroCarousel />
     <MeetingModes />
+    <AiNotesShowcase />
     <TeamMemberSection />
     <Testimonials />
     <FAQ />
